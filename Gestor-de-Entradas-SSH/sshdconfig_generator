@@ -1,0 +1,211 @@
+#!/bin/bash
+
+# Verifica que el usuario tenga permisos de superusuario
+if [[ $EUID -ne 0 ]]; then
+   echo "Este script debe ejecutarse con permisos de superusuario." 
+   exit 1
+fi
+
+# Archivo de configuración
+config_file="/etc/ssh/sshd_config"
+
+bak_num_file=$(ls -lAh /etc/ssh/sshd_config.bak* 2> /dev/null  | grep -v '^d' | wc -l)
+
+if [[ bak_num_file > 0 ]] && [[ -f /etc/ssh/sshd_config.bak ]]; then
+     # Create a backup of the original SSH server configuration file
+     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$((bak_num_file))
+else
+     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+fi
+
+declare -A ssh_params
+
+# add some key-value pairs with three related elements
+ssh_params["AcceptEnv"]="allow environment variables to be passed from the client to the server:,no"
+ssh_params["AddressFamily"]="Which address family/ies support (inet  inet6  any):,any"
+ssh_params["AllowAgentForwarding"]="allow SSH agent forwarding:,no"
+ssh_params["AllowGroups"]="restrict SSH access to specific groups of users:,"
+ssh_params["AllowTcpForwarding"]="allow TCP forwarding:,no"
+ssh_params["AllowUsers"]="restrict SSH access to specific users:,"
+ssh_params["AuthorizedKeysFile"]="specify the file location for authorized public keys:,.ssh/authorized_keys"
+ssh_params["Banner"]="display a banner message before login:,"
+ssh_params["ChallengeResponseAuthentication"]="use challenge-response authentication:,yes"
+ssh_params["ChrootDirectory"]="chroot SSH user to a specific directory:,"
+ssh_params["Ciphers"]="specify which ciphers to use for encryption:,aes128-ctr aes192-ctr aes256-ctr"
+ssh_params["ClientAliveCountMax"]="set the maximum number of client alive messages that can be sent without a response:,3"
+ssh_params["ClientAliveInterval"]="set the time interval in seconds between sending client alive messages:,0"
+ssh_params["Compression"]="enable compression of SSH traffic:,delayed"
+ssh_params["DenyGroups"]="deny SSH access to specific groups of users:,"
+ssh_params["DenyUsers"]="deny SSH access to specific users:,"
+ssh_params["ForceCommand"]="execute a specific command when a user logs in via SSH:,"
+ssh_params["GatewayPorts"]="allow remote hosts to connect to local forwarded ports:,no"
+ssh_params["GSSAPIAuthentication"]="enable GSSAPI authentication for SSH:,no"
+ssh_params["GSSAPICleanupCredentials"]="automatically clean up GSSAPI credentials after a session ends:,yes"
+ssh_params["HostbasedAuthentication"]="allow authentication based on the client host's key:,no"
+ssh_params["HostbasedUsesNameFromPacketOnly"]="restrict host-based authentication to the name provided by the client:,no"
+ssh_params["HostKey"]="specify the host keys for your SSH server:,/etc/ssh/ssh_host_rsa_key"
+ssh_params["IgnoreRhosts"]="ignore the user's .rhosts file for RhostsRSAAuthentication:,yes"
+ssh_params["IgnoreUserKnownHosts"]="ignore the user's known hosts file:,no"
+ssh_params["KerberosAuthentication"]="enable Kerberos authentication for SSH:,no"
+ssh_params["KerberosGetAFSToken"]="obtain an AFS token during Kerberos authentication:,no"
+ssh_params["KerberosOrLocalPasswd"]="allow local password authentication when Kerberos is unavailable:,yes"
+ssh_params["KerberosTicketCleanup"]="automatically destroy user's tickets and AFS tokens on logout:,yes"
+ssh_params["KeyRegenerationInterval"]="set the time interval in seconds after which the SSH server regenerates its server key:,1h"
+ssh_params["ListenAddress"]="specify the IP address or addresses on which to listen for SSH connections:,0.0.0.0"
+ssh_params["LoginGraceTime"]="set a time limit in seconds for users to enter valid credentials:,2m"
+ssh_params["LogLevel"]="set the logging level for SSH:,INFO"
+ssh_params["MACs"]="specify which message authentication codes (MACs) to use:,hmac-sha2-256 hmac-sha2-512"
+ssh_params["Match"]="apply specific settings to a subset of users or hosts:,"
+ssh_params["MaxAuthTries"]="set the maximum number of authentication attempts a user can make before being disconnected:,6"
+ssh_params["MaxSessions"]="set the maximum number of concurrent SSH sessions per network connection:,10"
+ssh_params["MaxStartups"]="set the maximum number of incoming SSH connections and rate limit for SSH sessions:,4"
+ssh_params["PasswordAuthentication"]="allow password authentication for SSH:,yes"
+ssh_params["PermitEmptyPasswords"]="allow users to log in without a password:,no"
+ssh_params["PermitOpen"]="specify which ports can be opened for remote port forwarding:,localhost:80"
+ssh_params["PermitRootLogin"]="allow root login over SSH:,no"
+ssh_params["PermitTunnel"]="allow SSH tunneling:,no"
+ssh_params["PermitUserEnvironment"]="allow users to set environment variables:,no"
+ssh_params["PidFile"]="specify the file in which to store the SSH server's process ID (PID):,/run/sshd.pid"
+ssh_params["Port"]="specify the port on which the SSH server listens for incoming connections:,22"
+ssh_params["PrintLastLog"]="print the date and time of the last login for each user:,yes"
+ssh_params["PrintMotd"]="print the message of the day (MOTD) upon login:,yes"
+ssh_params["Protocol"]="specify the SSH protocol version(s) to support:,2"
+ssh_params["PubkeyAuthentication"]="allow public key authentication for SSH:,yes"
+ssh_params["RhostsRSAAuthentication"]="allow RhostsRSA authentication for SSH:,no"
+ssh_params["RSAAuthentication"]="allow RSA authentication for SSH:,yes"
+ssh_params["ServerKeyBits"]="specify the size of the server's host key in bits:,2048"
+ssh_params["StrictModes"]="enforce strict mode for file permissions and ownership on the SSH server:,yes"
+ssh_params["Subsystem"]="specify a subsystem to be used as the default for SSH:,sftp /usr/lib/openssh/sftp-server"
+ssh_params["SyslogFacility"]="specify the facility code to be used when logging SSH events to syslog:,AUTH"
+ssh_params["TCPKeepAlive"]="enable TCP keep-alive messages for SSH connections:,yes"
+ssh_params["UseDNS"]="perform DNS resolution of IP addresses in SSH log messages:,no"
+ssh_params["UseLogin"]="enable the login(1) wrapper for SSH:,no"
+ssh_params["UsePAM"]="use Pluggable Authentication Modules (PAM) for SSH:,yes"
+ssh_params["UsePrivilegeSeparation"]="use privilege separation for SSH connections:,sandbox"
+ssh_params["X11DisplayOffset"]="specify the display offset for X11 forwarding:,10"
+ssh_params["X11Forwarding"]="allow X11 forwarding over SSH:,no"
+ssh_params["X11UseLocalhost"]="restrict X11 forwarding to the local machine only:,yes"
+ssh_params["XAuthLocation"]="specify the location of the xauth program for X11 forwarding:,"
+
+# Define function to read a parameter value from user input
+read_value() {
+    local parameter="$1"
+    local default_value="$2"
+    local options
+
+    case $parameter in
+        AddressFamily)
+            options=("inet" "inet6" "any")
+            ;;
+       X11Forwarding | TCPKeepAlive | X11UseLocalhost | AllowTcpForwarding | GatewayPorts | PermitEmptyPasswords | PermitRootLogin | PermitTunnel | PermitUserEnvironment | PrintLastLog | PrintMotd | UsePrivilegeSeparation | AcceptEnv | AllowAgentForwarding | ChallengeResponseAuthentication | GSSAPIAuthentication | GSSAPICleanupCredentials | HostbasedAuthentication | HostbasedUsesNameFromPacketOnly | IgnoreRhosts | KerberosAuthentication | KerberosGetAFSToken | KerberosOrLocalPasswd | KerberosTicketCleanup | PasswordAuthentication | PubkeyAuthentication | RhostsRSAAuthentication | RSAAuthentication | StrictModes | UseDNS | UseLogin | UsePAM | UsePrivilegeSeparation | X11Forwarding | X11UseLocalhost)
+            options=("yes" "no")
+            ;;
+        AllowGroups | DenyGroups)
+            read -rp "Enter a space-separated list of group names: " value
+            ;;
+        AllowUsers | DenyUsers)
+            read -rp "Enter a space-separated list of user names: " value
+            ;;
+        AuthorizedKeysFile)
+            read -rp "Enter a file path for authorized keys: " value
+            ;;
+        Banner)
+            read -rp "Enter a path for the banner file: " value
+            ;;
+        Compression)
+            options=("yes" "no" "delayed")
+            ;;
+        ChrootDirectory)
+            read -rp "Enter the directory to chroot: " value
+            ;;
+        Ciphers)
+            options=("3des-cbc" "aes128-cbc" "aes192-cbc" "aes256-cbc" "aes128-ctr" "aes192-ctr" "aes256-ctr" "aes128-gcm@openssh.com" "aes256-gcm@openssh.com" "arcfour" "arcfour128" "arcfour256" "blowfish-cbc" "cast128-cbc" "chacha20-poly1305@openssh.com")
+            ;;
+        ClientAliveCountMax)
+            read -rp "Enter a maximum number of client alive messages: " value
+            ;;
+        ClientAliveInterval)
+            read -rp "Enter a client alive message interval in seconds: " value
+            ;;
+        ForceCommand)
+            read -rp "Enter a command to be forced: " value
+            ;;
+        HostKey)
+            read -rp "Enter a file path for the host key: " value
+            ;;
+        KeyRegenerationInterval)
+            read -rp "Set the time interval: " value
+            ;;  
+        LogLevel)
+            options=("QUIET" "FATAL" "ERROR" "INFO" "VERBOSE" "DEBUG" "DEBUG1" "DEBUG2" "DEBUG3")
+            ;;
+        MACs)
+            options=("hmac-md5" "hmac-md5-96" "hmac-ripemd160" "hmac-sha1" "hmac-sha1-96" "hmac-sha2-256" "hmac-sha2-512" "umac-64@openssh.com" "umac-128@openssh.com" "hmac-md5-etm@openssh.com" "hmac-md5-96-etm@openssh.com" "hmac-ripemd160-etm@openssh.com" "hmac-sha1-etm@openssh.com" "hmac-sha1-96-etm@openssh.com" "hmac-sha2-256-etm@openssh.com" "hmac-sha2-512-etm@openssh.com" "umac-64-etm@openssh.com" "umac-128-etm@openssh.com")
+            ;;
+        Match)
+            read -rp "Enter a match pattern for conditionals: " value
+            ;;
+        MaxAuthTries)
+            read -rp "Enter a maximum number of authentication attempts: " value
+            ;;
+        MaxSessions)
+            read -rp "Enter a maximum number of open shell, login or subsystem sessions: " value
+            ;;
+        PasswordAuthentication)
+            options=("yes" "no")
+            ;;
+        PermitOpen)
+            read -rp "Enter a space-separated list of ports and/or host:port pairs: " value
+            ;;
+        PidFile)
+            read -rp "Enter a file path for the process ID: " value
+            ;;
+        Port)
+            read -rp "Enter a port number: " value
+            ;;
+        Protocol)
+            options=("1" "2")
+            ;;
+        RequiredAuthentications)
+            options=("none" "keyboard-interactive" "publickey" "publickey,keyboard-interactive")
+            ;;
+        Subsystem)
+            read -rp "Enter a subsystem name and a command to execute: " value
+            ;;
+        SyslogFacility)
+            options=("DAEMON" "USER" "AUTH" "AUTHPRIV" "LOCAL0" "LOCAL1" "LOCAL2" "LOCAL3" "LOCAL4" "LOCAL5" "LOCAL6" "LOCAL7")
+            ;;
+        X11DisplayOffset)
+            read -rp "Enter an integer value for the display offset: " value
+            ;;
+        *)
+            echo "Unsupported parameter: $parameter" >&2
+            return 1
+            ;;
+    esac
+
+    if [ ${#options[@]} -gt 0 ]; then
+        PS3="Select an option: "
+        select opt in "${options[@]}"; do
+            if [[ -n $opt ]]; then
+                value=$opt
+                break
+            fi
+        done
+    fi
+    if [[ $value == "" ]];
+    then
+     value=$default_value
+    fi
+    echo "${parameter}${value:+ }$value${value:+$'\n'}" >> sshd_config.example
+}
+
+# loop over the keys and values
+for key in "${!ssh_params[@]}"; do
+  # split the string into an array
+  IFS=, read -r definition default_value <<< "${ssh_params[$key]}"
+  echo "$key: $definition (default $default_value)"
+  read_value $key $default_value
+done
+
+
