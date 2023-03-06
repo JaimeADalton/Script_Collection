@@ -1,0 +1,16 @@
+#!/bin/bash
+trap '' INT
+allowed_commands=(ping tracepath ssh exit)
+
+echo "$(IFS=","; echo "Comandos Permitidos: ${allowed_commands[*]}")"
+
+while true; do
+        read -e -p "Restricted: $ " cmd
+        first_word=${cmd%% *}
+        cmd=$(echo $cmd | sed -e 's/&&.*//g' -e 's/||.*//g' -e 's/\;.*//g')
+        if [[ " ${allowed_commands[@]} " =~ " ${first_word} " ]]; then
+                eval "$cmd"
+        else
+                echo "Comando no permitido"
+        fi
+done
