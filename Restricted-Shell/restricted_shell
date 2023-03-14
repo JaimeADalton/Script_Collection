@@ -1,10 +1,7 @@
 #!/bin/bash
 
 clear && clear
-
-# Bloquear señales relevantes
 trap '' INT QUIT TSTP
-
 IP=$(echo $SSH_CONNECTION | awk '{print $1, $2}')
 
 allowed_commands=("ping" "tracepath" "plink" "ssh" "exit")
@@ -15,17 +12,15 @@ while true; do
     while [[ -z ${cmd_parts[0]} ]]; do
         read -e -p "Restricted: $ " -a cmd_parts
     done
-
+    
     first_word="${cmd_parts[0]}"
     cmd="${cmd_parts[*]}"
-
     echo "[ $(date +"%d/%m/%y %r")] Host: $IP  --  $cmd" >> /var/log/restricted_shell.log
 
     if [[ " ${allowed_commands[*]} " =~ " ${first_word} " ]]; then
         if [[ "${first_word}" == "exit" ]]; then
             exit 0
         else
-            # Ejecutar el comando de manera segura utilizando un subproceso y un array
             "${cmd_parts[@]}"
         fi
     else
